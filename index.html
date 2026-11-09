@@ -355,10 +355,14 @@ const I={
   target:svg('<circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')
 };
 const TYPES=['缶','ペット','瓶','紙パック','カップ','その他'];
-const MODELS=[['claude-sonnet-5-5','Sonnet 5.5（標準）'],['claude-haiku-5-5','Haiku 5.5（速い・安い）'],['claude-opus-5-5','Opus 5.5（高精度）']];
+const PROVIDERS={
+  gemini:{name:'Google Gemini（無料枠あり）',keyUrl:'https://aistudio.google.com/apikey',ph:'AIza...',models:[['gemini-3.5-flash-lite','3.5 Flash-Lite（標準・軽い）'],['gemini-3.6-flash','3.6 Flash（高精度）'],['gemini-2.5-flash','2.5 Flash（旧型）']]},
+  claude:{name:'Anthropic Claude（有料）',keyUrl:'https://console.anthropic.com/settings/keys',ph:'sk-ant-...',models:[['claude-sonnet-5-5','Sonnet 5.5（標準）'],['claude-haiku-5-5','Haiku 5.5（速い・安い）'],['claude-opus-5-5','Opus 5.5（高精度）']]}
+};
 const ls={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}},del(k){try{localStorage.removeItem(k);}catch(e){}}};
-const apiKey=()=>(ls.get('jm-key')||'').trim();
-const apiModel=()=>ls.get('jm-model')||MODELS[0][0];
+const provider=()=>{const v=ls.get('jm-provider');return PROVIDERS[v]?v:'gemini';};
+const apiKey=()=>(ls.get('jm-key-'+provider())||(provider()==='claude'?ls.get('jm-key'):'')||'').trim();
+const apiModel=()=>{const p=provider(),m=ls.get('jm-model-'+p);return PROVIDERS[p].models.some(x=>x[0]===m)?m:PROVIDERS[p].models[0][0];};
 
 /* ---------------- state ---------------- */
 const state={machines:[],loaded:false,persist:true,tab:'map',sel:[],openId:null,res:[],fitted:false,me:null,baseIdx:0,
@@ -707,24 +711,40 @@ function LocPicker(host,init,onPick){
 const SCHEMA='{"name":"商品名","maker":"メーカーまたはブランド","type":"缶|ペット|瓶|紙パック|カップ|その他","size":"350mlなど","price":130,"temp":"cold|hot|"}';
 const P_ALL='日本の自動販売機の正面写真です。写っている飲料の見本を、商品ごとに1件ずつ、左上から右下の順に読み取ってください。\nルール:\n- name は見本のラベルに書かれた商品名をそのまま書く。読めない商品は含めない。\n- price はボタン付近の表示が読み取れたときだけ数値(円)で書く。読めなければ null。\n- temp は、つめたい商品の表示(青)なら "cold"、あたたかい商品(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n- 同じ商品が複数の列に並んでいるときは1件にまとめる。\n- 推測で商品を作らない。自動販売機でなければ drinks は空配列にする。\n次の形式のJSONだけを返してください: {"drinks":['+SCHEMA+']}';
 const P_ONE='この画像には飲料が1つ、または自動販売機の一部が写っています。いちばん中心にある飲料を1つだけ読み取ってください。\nルール:\n- name はラベルに書かれた商品名をそのまま書く。読めなければ drink を null にする。\n- price は価格表示が見えるときだけ数値(円)、見えなければ null。\n- temp はつめたい表示(青)なら "cold"、あたたかい表示(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n- 推測で商品を作らない。\n次の形式のJSONだけを返してください: {"drink":'+SCHEMA+'} または {"drink":null}';
-async function callClaude(prompt,blob,signal){
+function parseJSONText(text){
+  const a=text.indexOf('{'),z=text.lastIndexOf('}');
+  try{return JSON.parse(a>=0&&z>a?text.slice(a,z+1):text);}catch(e){throw {code:'invalid_json'};}
+}
+async function callAI(prompt,blob,signal){
   const key=apiKey();
   if(!key)throw {code:'no_key'};
-  const b64=await blobToB64(blob);
+  const b64=await blobToB64(blob),prov=provider();
   let res;
   try{
-    res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,
-      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:apiModel(),max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:prompt}]}]})});
+    if(prov==='gemini'){
+      res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(apiModel())+':generateContent',{method:'POST',signal,
+        headers:{'content-type':'application/json','x-goog-api-key':key},
+        body:JSON.stringify({contents:[{role:'user',parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.1,maxOutputTokens:4096}})});
+    }else{
+      res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,
+        headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:apiModel(),max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:prompt}]}]})});
+    }
   }catch(e){if(e&&e.name==='AbortError')throw {code:'cancelled'};throw {code:'network'};}
   if(!res.ok){
-    const code=res.status===401||res.status===403?'auth':res.status===429?'rate_limited':res.status===400||res.status===413?'image_rejected':'upstream_error';
+    let body='';try{body=await res.text();}catch(e){}
+    const bad=/API key|API_KEY|permission|PERMISSION/i.test(body);
+    const code=res.status===401||res.status===403||(res.status===400&&bad)?'auth':res.status===429?'rate_limited':res.status===404?'model_missing':res.status===400||res.status===413?'image_rejected':'upstream_error';
     throw {code};
   }
   const data=await res.json();
-  const text=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
-  const a=text.indexOf('{'),z=text.lastIndexOf('}');
-  try{return JSON.parse(a>=0&&z>a?text.slice(a,z+1):text);}catch(e){throw {code:'invalid_json'};}
+  if(prov==='gemini'){
+    const parts=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts)||[];
+    const text=parts.map(x=>x.text||'').join('');
+    if(!text)throw {code:'invalid_json'};
+    return parseJSONText(text);
+  }
+  return parseJSONText((data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join(''));
 }
 function normDrink(x){
   if(!x||typeof x!=='object')return null;
@@ -736,7 +756,7 @@ function normDrink(x){
   return {id:newId('d'),name:name.slice(0,60),maker:String(x.maker||'').trim().slice(0,40),type,size:String(x.size||'').trim().slice(0,16),price,temp:x.temp==='hot'||x.temp==='cold'?x.temp:'',ai:true};
 }
 const dkey=d=>norm(d.name)+'|'+norm(d.maker);
-const AI_ERR={rate_limited:'短い間に使いすぎました。少し待ってからもう一度お試しください。',image_rejected:'この画像は読み取れませんでした。別の写真か、別の範囲で試してください。',invalid_json:'うまく読み取れませんでした。もう一度試すか、範囲を狭めてください。',auth:'APIキーが正しくありません。設定で確認してください。',network:'通信できませんでした。ネットワークを確認してもう一度お試しください。'};
+const AI_ERR={rate_limited:'短い間に使いすぎました（無料枠の上限のことがあります）。少し待ってからもう一度お試しください。',image_rejected:'この画像は読み取れませんでした。別の写真か、別の範囲で試してください。',invalid_json:'うまく読み取れませんでした。もう一度試すか、範囲を狭めてください。',auth:'APIキーが正しくありません。設定で確認してください。',model_missing:'選んだモデルが使えません。設定で別のモデルに切り替えてください。',network:'通信できませんでした。ネットワークを確認してもう一度お試しください。'};
 
 function DrinksEditor(host,ctx){
   let selId=null,busy=null,statusHTML='';
@@ -747,7 +767,7 @@ function DrinksEditor(host,ctx){
   const drinks=()=>ctx.getDrinks();
   function drawBar(){
     if(!ctx.hasPhoto()){R('bar').innerHTML='';return;}
-    if(!apiKey()){R('bar').innerHTML='<div class="ai-bar"><button class="btn" type="button" data-a="setup">'+I.spark+'AIで読み取る（APIキーを設定）</button></div><p class="note" style="margin-top:8px">写真から飲料を自動で読み取るには、設定でClaudeのAPIキーを入れてください。手入力でも登録できます。</p>';return;}
+    if(!apiKey()){R('bar').innerHTML='<div class="ai-bar"><button class="btn" type="button" data-a="setup">'+I.spark+'AIで読み取る（APIキーを設定）</button></div><p class="note" style="margin-top:8px">写真から飲料を自動で読み取るには、設定でAIのAPIキー（Googleの無料キーでOK）を入れてください。手入力でも登録できます。</p>';return;}
     R('bar').innerHTML='<div class="ai-bar"><button class="btn primary" type="button" data-a="all"'+(busy?' disabled':'')+'>'+I.spark+'写真から一度に読み取る</button><button class="btn" type="button" data-a="crop"'+(busy?' disabled':'')+'>'+I.crop+'範囲を選んで1本だけ</button><button class="btn" type="button" data-a="photo"'+(busy?' disabled':'')+'>'+I.camera+'別の写真で1本</button></div><p class="note" style="margin-top:8px">AIの読み取りは間違えることがあります。名前と価格を確認してください。</p>';
   }
   function drawStatus(){const s=R('status');s.hidden=!statusHTML;s.innerHTML=statusHTML;}
@@ -773,7 +793,7 @@ function DrinksEditor(host,ctx){
     const ctl=new AbortController();busy=ctl;drawBar();
     setStatus('<span class="spin"></span><span style="flex:1">AIが写真を読み取っています。数十秒かかることがあります。</span><button class="btn sm ghost" type="button" data-a="cancel">中止</button>');
     try{
-      const r=await callClaude(kind==='all'?P_ALL:P_ONE,blob,ctl.signal);
+      const r=await callAI(kind==='all'?P_ALL:P_ONE,blob,ctl.signal);
       let list=[];
       if(kind==='all'){const arr=Array.isArray(r)?r:(r&&r.drinks);list=(Array.isArray(arr)?arr:[]).slice(0,40).map(normDrink).filter(Boolean);}
       else{const one=r&&!Array.isArray(r)?(r.drink!==undefined?r.drink:r):(Array.isArray(r)?r[0]:null);const n=normDrink(one);if(n)list=[n];}
@@ -1008,10 +1028,20 @@ async function saveDraft(){
 function openSettings(){
   const el=$('#sheet-set');el.hidden=false;document.body.classList.add('lock');
   el.innerHTML='<div class="sheet-in"><div class="sh-top"><button class="icon-btn" type="button" data-act="set-close" aria-label="戻る">'+I.back+'</button><h2>設定とバックアップ</h2></div><div class="sh-body">'
-  +'<div class="panel"><h3>AIで飲料を読み取る</h3><p class="note">ClaudeのAPIキーを入れると、写真から飲料の名前・価格を読み取れます。キーはこのブラウザにだけ保存され、読み取りのときにAnthropicへ直接送られます。自分専用の端末で使ってください。</p><label class="fld">APIキー<input class="in" id="set-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-..." value="'+esc(apiKey())+'"></label><label class="fld">モデル<select class="in" id="set-model">'+MODELS.map(([v,t])=>'<option value="'+v+'"'+(apiModel()===v?' selected':'')+'>'+t+'</option>').join('')+'</select></label><div class="rowbtns"><button class="btn sm primary" type="button" data-act="set-save">保存</button><a class="btn sm" target="_blank" rel="noopener" href="https://console.anthropic.com/settings/keys">'+I.ext+'キーを発行する</a><button class="btn sm ghost" type="button" data-act="set-clearkey">キーを消す</button></div><p class="msg" id="set-msg" aria-live="polite"></p></div>'
+  +'<div class="panel"><h3>AIで飲料を読み取る</h3><p class="note">写真から飲料の名前・価格を読み取ります。キーはこのブラウザにだけ保存され、読み取りのときにAIの会社へ直接送られます。自分専用の端末で使ってください。</p><label class="fld">使うAI<select class="in" id="set-prov">'+Object.keys(PROVIDERS).map(k=>'<option value="'+k+'"'+(provider()===k?' selected':'')+'>'+PROVIDERS[k].name+'</option>').join('')+'</select></label><label class="fld">APIキー<input class="in" id="set-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label><label class="fld">モデル<select class="in" id="set-model"></select></label><div class="rowbtns"><button class="btn sm primary" type="button" data-act="set-save">保存</button><a class="btn sm" id="set-keylink" target="_blank" rel="noopener" href="#">'+I.ext+'キーを発行する</a><button class="btn sm ghost" type="button" data-act="set-clearkey">キーを消す</button></div><p class="note" id="set-free"></p><p class="msg" id="set-msg" aria-live="polite"></p></div>'
   +'<div class="panel"><h3>データのバックアップ</h3><p class="note">登録データ（写真を含む）はこのブラウザの中にだけあります。機種変更や別の端末へ移すときは、書き出したファイルを読み込みます。</p><div class="rowbtns"><button class="btn sm primary" type="button" data-act="set-export">書き出す</button><label class="btn sm" style="cursor:pointer">読み込む<input type="file" accept="application/json,.json" id="set-import" hidden></label></div><p class="msg" id="set-msg2" aria-live="polite"></p></div>'
   +'<div class="panel"><h3>地図の出典</h3><p class="note">地図: 地理院タイル（国土地理院）、&copy; OpenStreetMap contributors。住所検索: Nominatim（OpenStreetMap）。</p></div>'
   +'</div></div>';
+  fillProv($('#set-prov').value,true);
+  $('#set-prov').onchange=e=>fillProv(e.target.value,false);
+}
+function fillProv(p,initial){
+  const P=PROVIDERS[p],cur=provider()===p;
+  $('#set-key').value=(ls.get('jm-key-'+p)||(p==='claude'?ls.get('jm-key'):'')||'');
+  $('#set-key').placeholder=P.ph;
+  $('#set-model').innerHTML=P.models.map(([v,t])=>'<option value="'+v+'"'+((ls.get('jm-model-'+p)||P.models[0][0])===v?' selected':'')+'>'+t+'</option>').join('');
+  $('#set-keylink').href=P.keyUrl;
+  $('#set-free').textContent=p==='gemini'?'Googleアカウントがあれば、AI Studio で無料のキーを発行できます（クレジットカード不要）。無料枠では回数の上限があり、入力した写真がGoogleのサービス改善に使われることがあります。人の顔が写った写真は使わないでください。':'Claudeは従量課金です。クレジットの登録が必要です。';
 }
 function closeSettings(){const s=$('#sheet-set');s.hidden=true;s.innerHTML='';if($('#sheet-reg').hidden&&$('#sheet-det').hidden)document.body.classList.remove('lock');}
 async function exportAll(){
@@ -1089,8 +1119,8 @@ function bind(){
     }
     else if(a==='set-open')openSettings();
     else if(a==='set-close')closeSettings();
-    else if(a==='set-save'){const k=$('#set-key').value.trim();if(k)ls.set('jm-key',k);ls.set('jm-model',$('#set-model').value);const m=$('#set-msg');m.className='msg ok';m.textContent=k?'保存しました。':'モデルを保存しました。';}
-    else if(a==='set-clearkey'){ls.del('jm-key');$('#set-key').value='';const m=$('#set-msg');m.className='msg ok';m.textContent='キーを消しました。';}
+    else if(a==='set-save'){const p=$('#set-prov').value,k=$('#set-key').value.trim();ls.set('jm-provider',p);if(k)ls.set('jm-key-'+p,k);ls.set('jm-model-'+p,$('#set-model').value);const m=$('#set-msg');m.className='msg ok';m.textContent=k?'保存しました。':'保存しました（キーは未入力です）。';}
+    else if(a==='set-clearkey'){const p=$('#set-prov').value;ls.del('jm-key-'+p);if(p==='claude')ls.del('jm-key');$('#set-key').value='';const m=$('#set-msg');m.className='msg ok';m.textContent='キーを消しました。';}
     else if(a==='set-export')exportAll();
   });
   document.addEventListener('keydown',e=>{
