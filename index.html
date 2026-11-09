@@ -255,6 +255,33 @@ label.fld .in{font-weight:400;color:var(--ink)}
 .cr-bottom .btn:not(.primary){background:transparent;color:#E6EDF4;border-color:#34475A}
 .cr-help{text-align:center;font-size:13px;color:#9FB2C5;padding-bottom:6px}
 
+
+/* drink photos / lookup */
+.slot-img{display:grid;place-items:center;height:76px;border-radius:8px;background:var(--surface2);overflow:hidden;color:var(--muted)}
+.slot-img img{width:100%;height:100%;object-fit:contain;display:block}
+.ph{width:30px;height:30px;opacity:.55}
+.ai-tag.ok{background:color-mix(in srgb,var(--ok) 22%,var(--surface));color:var(--ok)}
+.dimg{width:24px;height:24px;object-fit:contain;border-radius:5px;background:var(--surface);flex:none}
+.dchip:has(.dimg){padding-left:3px}
+.ed-photo{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:start}
+.dphoto{width:104px;height:104px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;overflow:hidden;color:var(--muted)}
+.dphoto img{width:100%;height:100%;object-fit:contain;display:block}
+.dphoto .ph{width:40px;height:40px}
+.ed-pbtns{display:flex;flex-wrap:wrap;gap:6px}
+.lk{display:grid;gap:8px}
+.lookbox{background:var(--accent-soft);border-radius:12px;padding:10px 12px;display:grid;gap:6px;font-size:13.5px}
+.lookbox ul{margin:0;padding-left:18px}
+.lookbox li span{color:var(--muted);font-size:12px;margin-right:4px}
+.lookbox s{color:var(--muted)}
+.refs{display:flex;flex-wrap:wrap;gap:6px}
+.refs a{font-size:12px;color:var(--accent);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline}
+/* map type picker */
+.basepop{position:absolute;right:64px;top:66px;z-index:560;width:min(250px,calc(100% - 84px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:6px;display:grid;gap:2px}
+.bp-t{font-size:12px;color:var(--muted);padding:4px 10px}
+.bopt{display:grid;text-align:left;border:0;background:transparent;border-radius:10px;padding:6px 10px;min-height:46px}
+.bopt small{color:var(--muted);font-size:11.5px;line-height:1.3}
+.bopt[aria-pressed="true"]{background:var(--accent-soft)}
+.bopt[aria-pressed="true"] b{color:var(--accent)}
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);transform:translate(-50%,12px);background:var(--panel);color:#E6EDF4;padding:10px 16px;border-radius:12px;font-size:13.5px;max-width:min(92vw,520px);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:4000;box-shadow:var(--shadow)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}#toast,.pinicon svg{transition:none}}
@@ -287,6 +314,7 @@ label.fld .in{font-weight:400;color:var(--ink)}
           <button class="round" id="z-me" type="button" aria-label="現在地へ移動"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
           <button class="round" id="z-base" type="button" aria-label="地図の種類を切り替え"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
         </div>
+        <div class="basepop" id="basepop" hidden></div>
         <div class="mapempty" id="mapempty" hidden>
           <h2>最初の1台を登録しましょう</h2>
           <p>写真を撮って、場所と飲み物を登録すると、地図に自販機が並びます。</p>
@@ -352,6 +380,7 @@ const I={
   ext:svg('<path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/>'),
   map:svg('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'),
   check:svg('<path d="M5 12.5l4.5 4.5L19 7"/>'),
+  globe:svg('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 3.6 5.4 3.6 8.5s-1 5.9-3.6 8.5c-2.6-2.6-3.6-5.4-3.6-8.5s1-5.9 3.6-8.5z"/>'),
   target:svg('<circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')
 };
 const TYPES=['缶','ペット','瓶','紙パック','カップ','その他'];
@@ -521,7 +550,7 @@ function renderBanner(){
   if(!state.persist)t='このブラウザでは保存できません（プライベートモードなど）。閉じると登録内容が消えます。';
   b.hidden=!t;b.textContent=t;
 }
-const dchip=(d,hl)=>'<span class="dchip'+(hl?' hl':'')+'"><span class="dn">'+esc(d.name||'名称未入力')+'</span><span class="led">'+priceTxt(d.price)+'</span></span>';
+const dchip=(d,hl)=>'<span class="dchip'+(hl?' hl':'')+'">'+(d.photo?'<img class="dimg" src="'+esc(blobURL(d.photo))+'" alt="">':'')+'<span class="dn">'+esc(d.name||'名称未入力')+'</span><span class="led">'+priceTxt(d.price)+'</span></span>';
 function cardHTML(r){
   const m=r.m,ds=m.drinks||[],src=r.hits.length?r.hits:ds,show=src.slice(0,4),more=src.length-show.length,dt=distTxt(m);
   return '<article class="card" data-act="open" data-id="'+m.id+'" tabindex="0"><div class="thumb">'+imgTag(m,'thumb')+'</div><div class="cbody"><h3>'+esc(m.placeNote||'場所メモなし')+'</h3><p class="meta">'+fmtD(m.shotAt||m.createdAt)+' ・ '+(hasLoc(m)?(dt?'現在地から'+dt:'位置あり'):'位置未設定')+' ・ '+ds.length+'品</p><div class="dchips">'+show.map(d=>dchip(d,!!r.hits.length)).join('')+(more>0?'<span class="more">+'+more+'</span>':'')+(!ds.length?'<span class="meta">商品は未登録</span>':'')+'</div></div></article>';
@@ -576,11 +605,15 @@ function setTab(t){
 
 /* ---------------- map (Leaflet + GSI / OpenStreetMap tiles) ---------------- */
 const MAP={map:null,cluster:null,dim:null,markers:new Map(),base:null,me:null};
+const GSIA='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
 const BASES=[
-  {name:'地理院地図（標準）',url:'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',o:{maxNativeZoom:18,maxZoom:20,attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'}},
-  {name:'地理院地図（写真）',photo:true,url:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',o:{maxNativeZoom:18,maxZoom:20,attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'}},
-  {name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',o:{maxNativeZoom:19,maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}}
+  {id:'std',name:'標準地図',sub:'道路・駅名・建物',url:'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',o:{maxNativeZoom:18,maxZoom:20,attribution:GSIA}},
+  {id:'pale',name:'淡色地図',sub:'ピンが見やすい薄い地図',url:'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',o:{maxNativeZoom:18,maxZoom:20,attribution:GSIA}},
+  {id:'blank',name:'白地図',sub:'海岸線と境界だけ（拡大するとぼやけます）',url:'https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png',o:{maxNativeZoom:14,maxZoom:20,attribution:GSIA}},
+  {id:'photo',name:'衛星・航空写真',sub:'上空から見た写真',photo:true,url:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',o:{maxNativeZoom:18,maxZoom:20,attribution:GSIA}},
+  {id:'osm',name:'OpenStreetMap',sub:'海外でも使える地図',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',o:{maxNativeZoom:19,maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}}
 ];
+const baseIdxFromLS=()=>{const id=ls.get('jm-base2');const i=BASES.findIndex(b=>b.id===id);return i>=0?i:0;};
 const makeBase=i=>L.tileLayer(BASES[i].url,BASES[i].o);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const PIN_SVG='<svg viewBox="0 0 20 34" aria-hidden="true"><path class="b" d="M4 0h12a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4h-3.5L10 34l-2.5-4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4z"/><rect class="w" x="3.5" y="4" width="13" height="13" rx="2"/><rect class="b" x="5.5" y="7" width="2.4" height="7"/><rect class="b" x="8.8" y="7" width="2.4" height="7"/><rect class="b" x="12.1" y="7" width="2.4" height="7"/><rect class="w" x="3.5" y="20" width="6" height="3"/><circle class="w" cx="14.5" cy="21.5" r="1.6"/></svg>';
@@ -591,25 +624,31 @@ function mapInit(){
   const map=L.map(el,{zoomControl:false,worldCopyJump:true,maxZoom:20}).setView([36.2,138.2],5);
   map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
   MAP.map=map;
-  setBase(clamp(parseInt(ls.get('jm-base')||'0',10)||0,0,BASES.length-1),false);
+  setBase(baseIdxFromLS(),false);
   MAP.cluster=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:46,spiderfyOnMaxZoom:true,
     iconCreateFunction:c=>L.divIcon({html:'<span>'+c.getChildCount()+'</span>',className:'clus',iconSize:[38,38]})}).addTo(map);
   MAP.dim=L.layerGroup().addTo(map);
-  map.on('click',()=>setSel([]));
+  map.on('click',()=>{setSel([]);hideBasePop();});
   new ResizeObserver(()=>map.invalidateSize()).observe($('#mapbox'));
   $('#z-in').onclick=()=>map.zoomIn();
   $('#z-out').onclick=()=>map.zoomOut();
   $('#z-fit').onclick=()=>fitAll(true);
   $('#z-me').onclick=()=>locateMe(true);
-  $('#z-base').onclick=()=>{setBase((state.baseIdx+1)%BASES.length,true);};
+  $('#z-base').onclick=e=>{e.stopPropagation();const pop=$('#basepop');if(pop.hidden){drawBasePop();pop.hidden=false;}else pop.hidden=true;};
+}
+function hideBasePop(){const p=$('#basepop');if(p)p.hidden=true;}
+function drawBasePop(){
+  const p=$('#basepop');
+  p.innerHTML='<strong class="bp-t">地図の種類</strong>'+BASES.map((b,i)=>'<button type="button" class="bopt" data-base="'+i+'" aria-pressed="'+(i===state.baseIdx)+'"><b>'+esc(b.name)+'</b><small>'+esc(b.sub)+'</small></button>').join('');
 }
 function setBase(i,say){
   if(!MAP.map)return;
   if(MAP.base)MAP.map.removeLayer(MAP.base);
   MAP.base=makeBase(i).addTo(MAP.map);MAP.base.bringToBack();
-  state.baseIdx=i;ls.set('jm-base',String(i));
+  state.baseIdx=i;ls.set('jm-base2',BASES[i].id);
   $('#map').classList.toggle('is-photo',!!BASES[i].photo);
   if(say)toast(BASES[i].name);
+  if(!$('#basepop').hidden)drawBasePop();
 }
 function mapRender(){
   if(!MAP.map)return;
@@ -663,7 +702,7 @@ function showOnMap(id){
 
 /* ---------------- location picker (mini map + search + GPS + paste) ---------------- */
 function LocPicker(host,init,onPick){
-  host.innerHTML='<div class="lp"><div class="lp-map" data-lp="map"></div><div class="lp-search"><input class="in" type="search" data-lp="q" placeholder="住所・駅名・施設名で検索" autocomplete="off"><button class="btn sm primary" type="button" data-lp="go">検索</button></div><div class="lp-results" data-lp="res"></div><div class="rowbtns"><button class="btn sm" type="button" data-lp="gps">'+I.target+'現在地を使う</button><button class="btn sm ghost" type="button" data-lp="pastebtn">座標・URLを貼り付け</button></div><div data-lp="paste" hidden class="lp"><textarea class="in" data-lp="pastein" rows="2" placeholder="35.6812, 139.7671"></textarea><div class="rowbtns"><button class="btn sm primary" type="button" data-lp="apply">この座標にする</button><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps">'+I.ext+'Googleマップを開く</a></div></div><p class="msg" data-lp="msg" aria-live="polite">地図をタップするか、ピンをドラッグして位置を決めます。</p></div>';
+  host.innerHTML='<div class="lp"><select class="in" data-lp="base" aria-label="地図の種類" style="min-height:40px;padding:6px 10px;font-size:14px">'+BASES.map((b,i)=>'<option value="'+i+'"'+(i===state.baseIdx?' selected':'')+'>'+esc(b.name)+'</option>').join('')+'</select><div class="lp-map" data-lp="map"></div><div class="lp-search"><input class="in" type="search" data-lp="q" placeholder="住所・駅名・施設名で検索" autocomplete="off"><button class="btn sm primary" type="button" data-lp="go">検索</button></div><div class="lp-results" data-lp="res"></div><div class="rowbtns"><button class="btn sm" type="button" data-lp="gps">'+I.target+'現在地を使う</button><button class="btn sm ghost" type="button" data-lp="pastebtn">座標・URLを貼り付け</button></div><div data-lp="paste" hidden class="lp"><textarea class="in" data-lp="pastein" rows="2" placeholder="35.6812, 139.7671"></textarea><div class="rowbtns"><button class="btn sm primary" type="button" data-lp="apply">この座標にする</button><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps">'+I.ext+'Googleマップを開く</a></div></div><p class="msg" data-lp="msg" aria-live="polite">地図をタップするか、ピンをドラッグして位置を決めます。</p></div>';
   const q=s=>host.querySelector('[data-lp="'+s+'"]');
   const say=(t,c)=>{const m=q('msg');m.className='msg'+(c?' '+c:'');m.textContent=t;};
   let map=null,marker=null;
@@ -679,8 +718,10 @@ function LocPicker(host,init,onPick){
   if(window.L){
     map=L.map(q('map'),{zoomControl:true,worldCopyJump:true,maxZoom:20});
     map.attributionControl.setPrefix(false);
-    makeBase(state.baseIdx).addTo(map);
-    q('map').classList.toggle('is-photo',!!BASES[state.baseIdx].photo);
+    let baseL=null;
+    const useBase=i=>{if(baseL)map.removeLayer(baseL);baseL=makeBase(i).addTo(map);baseL.bringToBack();q('map').classList.toggle('is-photo',!!BASES[i].photo);};
+    useBase(state.baseIdx);
+    q('base').onchange=e=>{const i=+e.target.value;useBase(i);if(MAP.map)setBase(i,false);else{state.baseIdx=i;ls.set('jm-base2',BASES[i].id);}};
     const c=init&&typeof init.lat==='number'?[[init.lat,init.lng],17]:state.me?[[state.me.lat,state.me.lng],16]:MAP.map?[MAP.map.getCenter(),Math.max(MAP.map.getZoom(),13)]:[[35.68,139.76],12];
     map.setView(c[0],c[1]);
     if(init&&typeof init.lat==='number'){setPoint(init.lat,init.lng,init.src||'',false);say(coordTxt(init.lat,init.lng)+'（ピンをドラッグして微調整できます）');}
@@ -708,43 +749,73 @@ function LocPicker(host,init,onPick){
 }
 
 /* ---------------- AI (Claude API, called directly from this browser) ---------------- */
-const SCHEMA='{"name":"商品名","maker":"メーカーまたはブランド","type":"缶|ペット|瓶|紙パック|カップ|その他","size":"350mlなど","price":130,"temp":"cold|hot|"}';
-const P_ALL='日本の自動販売機の正面写真です。写っている飲料の見本を、商品ごとに1件ずつ、左上から右下の順に読み取ってください。\nルール:\n- name は見本のラベルに書かれた商品名をそのまま書く。読めない商品は含めない。\n- price はボタン付近の表示が読み取れたときだけ数値(円)で書く。読めなければ null。\n- temp は、つめたい商品の表示(青)なら "cold"、あたたかい商品(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n- 同じ商品が複数の列に並んでいるときは1件にまとめる。\n- 推測で商品を作らない。自動販売機でなければ drinks は空配列にする。\n次の形式のJSONだけを返してください: {"drinks":['+SCHEMA+']}';
-const P_ONE='この画像には飲料が1つ、または自動販売機の一部が写っています。いちばん中心にある飲料を1つだけ読み取ってください。\nルール:\n- name はラベルに書かれた商品名をそのまま書く。読めなければ drink を null にする。\n- price は価格表示が見えるときだけ数値(円)、見えなければ null。\n- temp はつめたい表示(青)なら "cold"、あたたかい表示(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n- 推測で商品を作らない。\n次の形式のJSONだけを返してください: {"drink":'+SCHEMA+'} または {"drink":null}';
+const SCHEMA='{"name":"商品名","maker":"メーカーまたはブランド","type":"缶|ペット|瓶|紙パック|カップ|その他","size":"350mlなど","price":130,"temp":"cold|hot|","box":[上端y,左端x,下端y,右端x]}';
+const BOXRULE='- box は、その飲料の見本（缶やボトル本体）だけをぴったり囲む四角を、画像全体の幅・高さをそれぞれ0〜1000とした整数 [上端y, 左端x, 下端y, 右端x] で書く。価格表示やボタンは含めない。\n';
+const P_ALL='日本の自動販売機の正面写真です。写っている飲料の見本を、商品ごとに1件ずつ、左上から右下の順に読み取ってください。\nルール:\n- name は見本のラベルに書かれた商品名をそのまま書く。読めない商品は含めない。\n- price はボタン付近の表示が読み取れたときだけ数値(円)で書く。読めなければ null。\n- temp は、つめたい商品の表示(青)なら "cold"、あたたかい商品(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n'+BOXRULE+'- 同じ商品が複数の列に並んでいるときは1件にまとめる。\n- 推測で商品を作らない。自動販売機でなければ drinks は空配列にする。\n次の形式のJSONだけを返してください: {"drinks":['+SCHEMA+']}';
+const P_ONE='この画像には飲料が1つ、または自動販売機の一部が写っています。いちばん中心にある飲料を1つだけ読み取ってください。\nルール:\n- name はラベルに書かれた商品名をそのまま書く。読めなければ drink を null にする。\n- price は価格表示が見えるときだけ数値(円)、見えなければ null。\n- temp はつめたい表示(青)なら "cold"、あたたかい表示(赤)なら "hot"、分からなければ ""。\n- type は 缶 / ペット / 瓶 / 紙パック / カップ / その他 のいずれか。\n'+BOXRULE+'- 推測で商品を作らない。\n次の形式のJSONだけを返してください: {"drink":'+SCHEMA+'} または {"drink":null}';
+const clean=s=>String(s||'').replace(/[\r\n「」"]/g,' ').trim().slice(0,80);
+const P_LOC=d=>'この自動販売機の写真の中から、飲料「'+clean(d.name)+'」'+(d.maker?'（'+clean(d.maker)+'）':'')+'の見本を探してください。\n見つかったら、その見本（缶やボトル本体）だけをぴったり囲む四角を、画像全体の幅・高さをそれぞれ0〜1000とした整数 [上端y, 左端x, 下端y, 右端x] で返してください。見つからなければ found を false にします。\nJSONだけを返してください: {"found":true,"box":[0,0,0,0]}';
+const P_LOOK=d=>'日本の自動販売機で売られている飲料を、インターネットで検索して照合してください。\n読み取った情報: 商品名「'+clean(d.name)+'」 / メーカー「'+(clean(d.maker)||'不明')+'」 / 容量「'+(clean(d.size)||'不明')+'」 / 容器「'+(d.type||'不明')+'」\n（画像が付いている場合は、その飲料の見本写真です。）\nルール:\n- メーカー公式サイトや商品ページなど信頼できる情報で、実在する商品と一致すると確認できたときだけ match を true にする。\n- name は公式の正式な商品名、maker は製造・販売しているメーカー名（会社名がわかるときは会社名）、size は主な容量、type は 缶 / ペット / 瓶 / 紙パック / カップ / その他。\n- 確認できない項目は空文字にする。推測で作らない。価格は答えない。\n- note に根拠を40字以内で書く。\n次の形式のJSONだけを返してください: {"match":true,"name":"","maker":"","type":"","size":"","note":""}';
+
 function parseJSONText(text){
   const a=text.indexOf('{'),z=text.lastIndexOf('}');
   try{return JSON.parse(a>=0&&z>a?text.slice(a,z+1):text);}catch(e){throw {code:'invalid_json'};}
 }
-async function callAI(prompt,blob,signal){
+async function postAI({prompt,blob,signal,search}){
   const key=apiKey();
   if(!key)throw {code:'no_key'};
-  const b64=await blobToB64(blob),prov=provider();
+  const b64=blob?await blobToB64(blob):null,prov=provider();
   let res;
   try{
     if(prov==='gemini'){
+      const parts=[];
+      if(b64)parts.push({inline_data:{mime_type:'image/jpeg',data:b64}});
+      parts.push({text:prompt});
+      const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.1,maxOutputTokens:8192}};
+      if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
       res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(apiModel())+':generateContent',{method:'POST',signal,
-        headers:{'content-type':'application/json','x-goog-api-key':key},
-        body:JSON.stringify({contents:[{role:'user',parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.1,maxOutputTokens:4096}})});
+        headers:{'content-type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)});
     }else{
+      const content=[];
+      if(b64)content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}});
+      content.push({type:'text',text:prompt});
+      const body={model:apiModel(),max_tokens:4000,messages:[{role:'user',content}]};
+      if(search)body.tools=[{type:'web_search_20250305',name:'web_search',max_uses:3}];
       res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,
-        headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:apiModel(),max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:prompt}]}]})});
+        headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
     }
   }catch(e){if(e&&e.name==='AbortError')throw {code:'cancelled'};throw {code:'network'};}
   if(!res.ok){
     let body='';try{body=await res.text();}catch(e){}
     const bad=/API key|API_KEY|permission|PERMISSION/i.test(body);
-    const code=res.status===401||res.status===403||(res.status===400&&bad)?'auth':res.status===429?'rate_limited':res.status===404?'model_missing':res.status===400||res.status===413?'image_rejected':'upstream_error';
+    let code=res.status===401||res.status===403||(res.status===400&&bad)?'auth':res.status===429?'rate_limited':res.status===404?'model_missing':res.status===400||res.status===413?'image_rejected':'upstream_error';
+    if(search&&code==='image_rejected')code='search_failed';
     throw {code};
   }
   const data=await res.json();
+  let text='';const refs=[];
   if(prov==='gemini'){
-    const parts=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts)||[];
-    const text=parts.map(x=>x.text||'').join('');
-    if(!text)throw {code:'invalid_json'};
-    return parseJSONText(text);
+    const c=data.candidates&&data.candidates[0];
+    const parts=(c&&c.content&&c.content.parts)||[];
+    text=parts.map(x=>x.text||'').join('');
+    const ch=(c&&c.groundingMetadata&&c.groundingMetadata.groundingChunks)||[];
+    for(const g of ch)if(g.web&&g.web.uri)refs.push({title:g.web.title||'',uri:g.web.uri});
+  }else{
+    for(const b of (data.content||[])){
+      if(b.type==='text')text+=b.text||'';
+      else if(b.type==='web_search_tool_result'&&Array.isArray(b.content))for(const g of b.content)if(g&&g.url)refs.push({title:g.title||'',uri:g.url});
+    }
   }
-  return parseJSONText((data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join(''));
+  if(!text)throw {code:'invalid_json'};
+  return {text,refs};
+}
+async function callAI(prompt,blob,signal){const r=await postAI({prompt,blob,signal});return parseJSONText(r.text);}
+function normBox(b){
+  if(!Array.isArray(b)||b.length!==4)return null;
+  const v=b.map(Number);if(v.some(x=>!isFinite(x)))return null;
+  const [y0,x0,y1,x1]=v.map(x=>clamp(x,0,1000));
+  if(y1-y0<30||x1-x0<30)return null;
+  return [y0,x0,y1,x1];
 }
 function normDrink(x){
   if(!x||typeof x!=='object')return null;
@@ -753,91 +824,233 @@ function normDrink(x){
   let price=null;
   if(typeof x.price==='number'||/^\d+$/.test(String(x.price==null?'':x.price)))price=Math.round(Number(x.price));
   if(price!==null&&(!(price>0)||price>3000))price=null;
-  return {id:newId('d'),name:name.slice(0,60),maker:String(x.maker||'').trim().slice(0,40),type,size:String(x.size||'').trim().slice(0,16),price,temp:x.temp==='hot'||x.temp==='cold'?x.temp:'',ai:true};
+  return {id:newId('d'),name:name.slice(0,60),maker:String(x.maker||'').trim().slice(0,40),type,size:String(x.size||'').trim().slice(0,16),price,temp:x.temp==='hot'||x.temp==='cold'?x.temp:'',ai:true,photo:null,checked:false,box:normBox(x.box||x.box_2d)};
+}
+function normLook(r){
+  if(!r||r.match!==true)return null;
+  let type=String(r.type||'').replace('ペットボトル','ペット');if(!TYPES.includes(type))type='';
+  const o={name:String(r.name||'').trim().slice(0,60),maker:String(r.maker||'').trim().slice(0,40),type,size:String(r.size||'').trim().slice(0,16),note:String(r.note||'').trim().slice(0,80)};
+  return (o.name||o.maker)?o:null;
 }
 const dkey=d=>norm(d.name)+'|'+norm(d.maker);
-const AI_ERR={rate_limited:'短い間に使いすぎました（無料枠の上限のことがあります）。少し待ってからもう一度お試しください。',image_rejected:'この画像は読み取れませんでした。別の写真か、別の範囲で試してください。',invalid_json:'うまく読み取れませんでした。もう一度試すか、範囲を狭めてください。',auth:'APIキーが正しくありません。設定で確認してください。',model_missing:'選んだモデルが使えません。設定で別のモデルに切り替えてください。',network:'通信できませんでした。ネットワークを確認してもう一度お試しください。'};
+const AI_ERR={rate_limited:'短い間に使いすぎました（無料枠の上限のことがあります）。少し待ってからもう一度お試しください。',image_rejected:'この画像は読み取れませんでした。別の写真か、別の範囲で試してください。',invalid_json:'うまく読み取れませんでした。もう一度試してください。',auth:'APIキーが正しくありません。設定で確認してください。',model_missing:'選んだモデルが使えません。設定で別のモデルに切り替えてください。',search_failed:'このモデルやキーでは、ネット照合が使えませんでした。設定で別のモデルを選ぶと使えることがあります。',network:'通信できませんでした。ネットワークを確認してもう一度お試しください。'};
+
+/* ---- drink photos ---- */
+const _bu=new WeakMap();
+function blobURL(b){if(!b)return '';let u=_bu.get(b);if(!u){u=URL.createObjectURL(b);_bu.set(b,u);}return u;}
+async function cropImg(img,box){
+  const W=img.naturalWidth,H=img.naturalHeight,[y0,x0,y1,x1]=box;
+  const bw=(x1-x0)/1000*W,bh=(y1-y0)/1000*H,pad=Math.max(bw,bh)*0.06;
+  const sx=Math.max(0,x0/1000*W-pad),sy=Math.max(0,y0/1000*H-pad);
+  const ex=Math.min(W,x1/1000*W+pad),ey=Math.min(H,y1/1000*H+pad);
+  return imgBlob(img,360,.82,sx,sy,ex-sx,ey-sy);
+}
+async function cropBlobFrom(src,box){
+  const u=URL.createObjectURL(src);
+  try{return await cropImg(await loadImg(u),box);}finally{URL.revokeObjectURL(u);}
+}
+async function shrinkBlob(src,max){
+  const u=URL.createObjectURL(src);
+  try{const img=await loadImg(u);return await imgBlob(img,max,.82);}finally{URL.revokeObjectURL(u);}
+}
+const PH_SVG='<svg class="ph" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 2.5h5v3l1.4 2.4a3 3 0 0 1 .4 1.5V20a1.5 1.5 0 0 1-1.5 1.5H9.2A1.5 1.5 0 0 1 7.7 20V9.4a3 3 0 0 1 .4-1.5L9.5 5.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+const drinkImg=d=>d.photo?'<img src="'+esc(blobURL(d.photo))+'" alt="">':PH_SVG;
 
 function DrinksEditor(host,ctx){
   let selId=null,busy=null,statusHTML='';
+  const look={};
   host.innerHTML='';
   const root=document.createElement('div');root.style.display='grid';root.style.gap='12px';host.appendChild(root);
-  root.innerHTML='<div data-r="bar"></div><div class="status" data-r="status" hidden aria-live="polite"></div><div class="slots" data-r="grid"></div><div data-r="ed"></div><input type="file" accept="image/*" hidden data-r="file">';
+  root.innerHTML='<div data-r="bar"></div><div class="status" data-r="status" hidden aria-live="polite"></div><div class="slots" data-r="grid"></div><div data-r="ed"></div><input type="file" accept="image/*" hidden data-r="file"><input type="file" accept="image/*" hidden data-r="dfile">';
   const R=n=>root.querySelector('[data-r="'+n+'"]');
   const drinks=()=>ctx.getDrinks();
+  const getD=id=>drinks().find(x=>x.id===id);
+  const spinHTML=msg=>'<span class="spin"></span><span style="flex:1">'+esc(msg)+'</span><button class="btn sm ghost" type="button" data-a="cancel">中止</button>';
   function drawBar(){
     if(!ctx.hasPhoto()){R('bar').innerHTML='';return;}
-    if(!apiKey()){R('bar').innerHTML='<div class="ai-bar"><button class="btn" type="button" data-a="setup">'+I.spark+'AIで読み取る（APIキーを設定）</button></div><p class="note" style="margin-top:8px">写真から飲料を自動で読み取るには、設定でAIのAPIキー（Googleの無料キーでOK）を入れてください。手入力でも登録できます。</p>';return;}
-    R('bar').innerHTML='<div class="ai-bar"><button class="btn primary" type="button" data-a="all"'+(busy?' disabled':'')+'>'+I.spark+'写真から一度に読み取る</button><button class="btn" type="button" data-a="crop"'+(busy?' disabled':'')+'>'+I.crop+'範囲を選んで1本だけ</button><button class="btn" type="button" data-a="photo"'+(busy?' disabled':'')+'>'+I.camera+'別の写真で1本</button></div><p class="note" style="margin-top:8px">AIの読み取りは間違えることがあります。名前と価格を確認してください。</p>';
+    if(!apiKey()){R('bar').innerHTML='<div class="ai-bar"><button class="btn" type="button" data-a="setup">'+I.spark+'AIで読み取る（APIキーを設定）</button></div><p class="note" style="margin-top:8px">写真から飲料を自動で読み取り、1本ずつ切り抜くには、設定でAIのAPIキー（Googleの無料キーでOK）を入れてください。手入力でも登録できます。</p>';return;}
+    const dis=busy?' disabled':'';
+    const todo=drinks().some(d=>!d.checked&&String(d.name||'').trim());
+    R('bar').innerHTML='<div class="ai-bar"><button class="btn primary" type="button" data-a="all"'+dis+'>'+I.spark+'写真から一度に読み取る</button><button class="btn" type="button" data-a="crop"'+dis+'>'+I.crop+'範囲を選んで1本だけ</button><button class="btn" type="button" data-a="photo"'+dis+'>'+I.camera+'別の写真で1本</button>'+(todo?'<button class="btn" type="button" data-a="look-all"'+dis+'>'+I.globe+'ネットでまとめて照合</button>':'')+'</div><p class="note" style="margin-top:8px">AIは飲料ごとの写真も切り抜きます。ネット照合では、製造元と正式な商品名を調べて提案します。どちらも間違えることがあるので、確認してください。</p>';
   }
-  function drawStatus(){const s=R('status');s.hidden=!statusHTML;s.innerHTML=statusHTML;}
+  function setStatus(h){statusHTML=h;const s=R('status');s.hidden=!statusHTML;s.innerHTML=statusHTML;}
   function drawGrid(){
-    R('grid').innerHTML=drinks().map(d=>'<button type="button" class="slot'+(d.id===selId?' sel':'')+'" data-a="pick" data-id="'+d.id+'"><span class="slot-top"><i class="td td-'+(d.temp||'n')+'"></i><span>'+esc(d.type||'')+'</span>'+(d.ai?'<span class="ai-tag">AI</span>':'')+'</span><span class="slot-name">'+esc(d.name||'名称未入力')+'</span><span class="slot-maker">'+esc(d.maker||'')+'</span><span class="led">'+priceTxt(d.price)+'</span></button>').join('')+'<button type="button" class="slot add" data-a="add">'+I.plus+'手入力で追加</button>';
+    R('grid').innerHTML=drinks().map(d=>'<button type="button" class="slot'+(d.id===selId?' sel':'')+'" data-a="pick" data-id="'+d.id+'"><span class="slot-img">'+drinkImg(d)+'</span><span class="slot-top"><i class="td td-'+(d.temp||'n')+'"></i><span>'+esc(d.type||'')+'</span>'+(d.ai?'<span class="ai-tag">AI</span>':'')+(d.checked?'<span class="ai-tag ok" title="ネット照合済み">✓</span>':'')+'</span><span class="slot-name">'+esc(d.name||'名称未入力')+'</span><span class="slot-maker">'+esc(d.maker||'')+'</span><span class="led">'+priceTxt(d.price)+'</span></button>').join('')+'<button type="button" class="slot add" data-a="add">'+I.plus+'手入力で追加</button>';
+  }
+  function drawLk(){
+    const el=R('ed').querySelector('[data-r="lk"]'),d=getD(selId);
+    if(!el||!d)return;
+    const L=look[d.id],key=!!apiKey();
+    let h='';
+    if(key&&String(d.name||'').trim())h+='<button class="btn" type="button" data-a="look"'+(busy?' disabled':'')+'>'+I.globe+'ネットで照合（製造元・正式名）</button>';
+    else if(!key)h+='<p class="note">ネット照合には、設定でAPIキーが必要です。</p>';
+    if(L&&L.o){
+      const rows=[['name','商品名'],['maker','メーカー'],['type','容器'],['size','容量']].filter(([k])=>L.o[k]&&L.o[k]!==(d[k]||''));
+      h+='<div class="lookbox"><strong>ネットの照合結果</strong>'+(rows.length?'<ul>'+rows.map(([k,t])=>'<li><span>'+t+'</span> '+(d[k]?'<s>'+esc(d[k])+'</s> → ':'')+'<b>'+esc(L.o[k])+'</b></li>').join('')+'</ul>':'<p class="note">読み取った内容と一致しています。</p>')+(L.o.note?'<p class="note">'+esc(L.o.note)+'</p>':'')+'<div class="rowbtns"><button class="btn sm primary" type="button" data-a="look-apply">反映する</button><button class="btn sm ghost" type="button" data-a="look-skip">使わない</button></div></div>';
+    }else if(L&&L.none)h+='<p class="note">ネット上で確かな一致は見つかりませんでした。名前を直してからもう一度試すか、そのまま使えます。</p>';
+    if(d.checked){
+      const refs=(d.refs||[]).filter(r=>/^https?:\/\//i.test(r.uri||'')).slice(0,3);
+      h+='<div class="tags"><span class="tag ok">'+I.check+'ネット照合済み</span></div>'+(refs.length?'<div class="refs">'+refs.map(r=>'<a target="_blank" rel="noopener noreferrer" href="'+esc(r.uri)+'">'+esc(r.title||'参照ページ')+'</a>').join('')+'</div>':'')+(d.orig?'<button class="btn sm ghost" type="button" data-a="look-undo">読み取り時の内容に戻す</button>':'');
+    }
+    el.innerHTML=h;
   }
   function drawEd(){
-    const d=drinks().find(x=>x.id===selId);
+    const d=getD(selId);
     if(!d){R('ed').innerHTML='';return;}
-    R('ed').innerHTML='<div class="ed" data-id="'+d.id+'"><div class="ed-h"><strong>商品を編集</strong><button class="btn sm ghost" type="button" data-a="close-ed">閉じる</button></div><label class="fld">商品名<input class="in" data-f="name" value="'+esc(d.name)+'" maxlength="60"></label><label class="fld">メーカー・ブランド<input class="in" data-f="maker" value="'+esc(d.maker||'')+'" maxlength="40"></label><div class="g2"><label class="fld">容器<select class="in" data-f="type"><option value="">未選択</option>'+TYPES.map(t=>'<option'+(d.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></label><label class="fld">容量<input class="in" data-f="size" value="'+esc(d.size||'')+'" placeholder="350ml" maxlength="16"></label></div><div class="g2"><label class="fld">価格（円）<input class="in" data-f="price" inputmode="numeric" value="'+(typeof d.price==='number'?d.price:'')+'" placeholder="130"></label><label class="fld">温度<select class="in" data-f="temp"><option value="">指定なし</option><option value="cold"'+(d.temp==='cold'?' selected':'')+'>つめたい</option><option value="hot"'+(d.temp==='hot'?' selected':'')+'>あたたかい</option></select></label></div><button class="btn danger" type="button" data-a="del">この商品を削除</button></div>';
+    const canCrop=ctx.hasPhoto();
+    R('ed').innerHTML='<div class="ed" data-id="'+d.id+'"><div class="ed-h"><strong>商品を編集</strong><button class="btn sm ghost" type="button" data-a="close-ed">閉じる</button></div>'
+    +'<div class="ed-photo"><div class="dphoto">'+drinkImg(d)+'</div><div class="ed-pbtns">'
+    +(canCrop?'<button class="btn sm" type="button" data-a="recrop">'+I.crop+'写真から切り抜く</button>':'')
+    +(canCrop&&apiKey()?'<button class="btn sm" type="button" data-a="aicrop"'+(busy?' disabled':'')+'>'+I.spark+'AIで切り抜く</button>':'')
+    +'<button class="btn sm" type="button" data-a="dshot">'+I.camera+'撮影・選択</button>'
+    +(d.photo?'<button class="btn sm ghost" type="button" data-a="dphoto-del">写真を消す</button>':'')+'</div></div>'
+    +'<div data-r="lk" class="lk"></div>'
+    +'<label class="fld">商品名<input class="in" data-f="name" value="'+esc(d.name)+'" maxlength="60"></label><label class="fld">メーカー・ブランド<input class="in" data-f="maker" value="'+esc(d.maker||'')+'" maxlength="40"></label><div class="g2"><label class="fld">容器<select class="in" data-f="type"><option value="">未選択</option>'+TYPES.map(t=>'<option'+(d.type===t?' selected':'')+'>'+t+'</option>').join('')+'</select></label><label class="fld">容量<input class="in" data-f="size" value="'+esc(d.size||'')+'" placeholder="350ml" maxlength="16"></label></div><div class="g2"><label class="fld">価格（円）<input class="in" data-f="price" inputmode="numeric" value="'+(typeof d.price==='number'?d.price:'')+'" placeholder="130"></label><label class="fld">温度<select class="in" data-f="temp"><option value="">指定なし</option><option value="cold"'+(d.temp==='cold'?' selected':'')+'>つめたい</option><option value="hot"'+(d.temp==='hot'?' selected':'')+'>あたたかい</option></select></label></div><button class="btn danger" type="button" data-a="del">この商品を削除</button></div>';
+    drawLk();
   }
-  function drawAll(){drawBar();drawStatus();drawGrid();drawEd();}
-  function setStatus(h){statusHTML=h;drawStatus();}
+  function drawAll(){drawBar();R('status').hidden=!statusHTML;drawGrid();drawEd();}
   function addDrinks(list,selectFirst){
-    const cur=drinks(),keys=new Set(cur.map(dkey));let added=0,first=null;
-    for(const n of list){if(keys.has(dkey(n)))continue;keys.add(dkey(n));cur.push(n);added++;if(!first)first=n;}
-    if(added){ctx.onChange();if(selectFirst&&first)selId=first.id;}
+    const cur=drinks(),byKey=new Map(cur.map(d=>[dkey(d),d]));let added=0,first=null,filled=0;
+    for(const n of list){
+      const ex=byKey.get(dkey(n));
+      if(ex){if(!ex.photo&&n.photo){ex.photo=n.photo;filled++;}continue;}
+      byKey.set(dkey(n),n);cur.push(n);added++;if(!first)first=n;
+    }
+    if(added||filled){ctx.onChange();if(selectFirst&&first)selId=first.id;}
     drawGrid();drawEd();
-    return added;
+    return {added,filled};
   }
-  async function run(kind,blob){
+  async function withBusy(msg,fn){
     if(busy)return;
     const ctl=new AbortController();busy=ctl;drawBar();
-    setStatus('<span class="spin"></span><span style="flex:1">AIが写真を読み取っています。数十秒かかることがあります。</span><button class="btn sm ghost" type="button" data-a="cancel">中止</button>');
-    try{
-      const r=await callAI(kind==='all'?P_ALL:P_ONE,blob,ctl.signal);
+    setStatus(spinHTML(msg));
+    try{await fn(ctl.signal);}
+    catch(e){const code=e&&e.code;setStatus(code==='cancelled'?'中止しました。':esc(AI_ERR[code]||'うまくいきませんでした。もう一度お試しください。'));}
+    finally{busy=null;drawBar();drawGrid();drawEd();}
+  }
+  function readOne(blob,kind){
+    return withBusy('AIが写真を読み取っています。数十秒かかることがあります。',async signal=>{
+      const r=await callAI(kind==='all'?P_ALL:P_ONE,blob,signal);
       let list=[];
       if(kind==='all'){const arr=Array.isArray(r)?r:(r&&r.drinks);list=(Array.isArray(arr)?arr:[]).slice(0,40).map(normDrink).filter(Boolean);}
       else{const one=r&&!Array.isArray(r)?(r.drink!==undefined?r.drink:r):(Array.isArray(r)?r[0]:null);const n=normDrink(one);if(n)list=[n];}
-      if(!list.length)setStatus(kind==='all'?'商品を読み取れませんでした。写真全体が写っているか確認するか、範囲を選んで1本ずつ試してください。':'商品を判別できませんでした。範囲を変えるか、手入力で追加してください。');
-      else{const added=addDrinks(list,kind==='one');setStatus(added?added+'件を追加しました。内容を確認してください。':'すでに登録済みの商品でした。');}
-    }catch(e){
-      const code=e&&e.code;
-      if(code==='cancelled')setStatus('読み取りを中止しました。');
-      else setStatus(esc(AI_ERR[code]||'読み取りに失敗しました。もう一度お試しください。'));
-    }finally{busy=null;drawBar();}
+      if(!list.length){setStatus(kind==='all'?'商品を読み取れませんでした。写真全体が写っているか確認するか、範囲を選んで1本ずつ試してください。':'商品を判別できませんでした。範囲を変えるか、手入力で追加してください。');return;}
+      setStatus(spinHTML('飲料ごとの写真を切り抜いています…'));
+      const u=URL.createObjectURL(blob);
+      let img=null;try{img=await loadImg(u);}catch(e){}
+      for(const n of list){
+        try{if(img&&n.box)n.photo=await cropImg(img,n.box);else if(kind==='one')n.photo=await shrinkBlob(blob,360);}catch(e){}
+        delete n.box;
+      }
+      URL.revokeObjectURL(u);
+      const k=list.filter(n=>n.photo).length;
+      const res=addDrinks(list,kind==='one');
+      setStatus(res.added||res.filled?(res.added+'件を追加しました'+(k?'（写真'+k+'枚）':'')+'。内容を確認してください。'):'すでに登録済みの商品でした。');
+    });
+  }
+  function locateOne(id){
+    const d=getD(id),blob=ctx.getBlob();if(!d||!blob)return;
+    return withBusy('AIが写真から「'+(d.name||'この飲料')+'」を探しています…',async signal=>{
+      const r=await callAI(P_LOC(d),blob,signal);
+      const box=r&&r.found!==false?normBox(r.box):null;
+      if(!box){setStatus('写真の中で見つかりませんでした。「写真から切り抜く」で手動で選んでください。');return;}
+      d.photo=await cropBlobFrom(blob,box);ctx.onChange();
+      setStatus('切り抜きました。ずれているときは「写真から切り抜く」で直せます。');
+    });
+  }
+  function applyLook(d,o,refs){
+    if(!d.orig)d.orig={name:d.name,maker:d.maker||'',type:d.type||'',size:d.size||''};
+    for(const k of ['name','maker','type','size'])if(o[k])d[k]=o[k];
+    d.checked=true;d.refs=(refs||[]).slice(0,3);
+  }
+  async function lookupCall(d,signal){
+    const r=await postAI({prompt:P_LOOK(d),blob:d.photo||null,signal,search:true});
+    return {o:normLook(parseJSONText(r.text)),refs:r.refs};
+  }
+  function lookOne(id){
+    const d=getD(id);if(!d)return;
+    return withBusy('「'+d.name+'」をネットで照合しています…',async signal=>{
+      const {o,refs}=await lookupCall(d,signal);
+      if(!o){look[id]={none:true};setStatus('ネット上で確かな一致は見つかりませんでした。');}
+      else{look[id]={o,refs};setStatus('照合結果が見つかりました。内容を確認して反映してください。');}
+    });
+  }
+  function lookAll(){
+    return withBusy('ネットで照合しています…',async signal=>{
+      const todo=drinks().filter(d=>!d.checked&&String(d.name||'').trim());
+      let ok=0,miss=0,stop='';
+      for(let i=0;i<todo.length;i++){
+        if(signal.aborted){stop='cancelled';break;}
+        const d=todo[i];
+        setStatus(spinHTML('ネットで照合しています… '+(i+1)+' / '+todo.length));
+        try{
+          const {o,refs}=await lookupCall(d,signal);
+          if(o){applyLook(d,o,refs);ok++;ctx.onChange();drawGrid();}else miss++;
+        }catch(e){
+          const c=e&&e.code;
+          if(c==='cancelled'||c==='auth'||c==='rate_limited'||c==='search_failed'||c==='network'||c==='model_missing'){stop=c;break;}
+          miss++;
+        }
+        await new Promise(r=>{const t=setTimeout(r,1100);signal.addEventListener('abort',()=>{clearTimeout(t);r();},{once:true});});
+      }
+      setStatus(ok+'件を照合して反映しました'+(miss?'（一致なし '+miss+'件）':'')+'。'+(stop&&stop!=='cancelled'?esc(AI_ERR[stop]||'')+' 続きはもう一度押してください。':stop==='cancelled'?'途中で中止しました。':''));
+    });
   }
   root.addEventListener('click',async e=>{
     const b=e.target.closest('[data-a]');if(!b||!root.contains(b))return;
     const a=b.dataset.a;
     if(a==='pick'){selId=selId===b.dataset.id?null:b.dataset.id;drawGrid();drawEd();if(selId)R('ed').scrollIntoView({block:'nearest',behavior:'smooth'});}
-    else if(a==='add'){const d={id:newId('d'),name:'',maker:'',type:'',size:'',price:null,temp:'',ai:false};drinks().push(d);selId=d.id;ctx.onChange();drawGrid();drawEd();const f=R('ed').querySelector('[data-f="name"]');if(f)f.focus();}
+    else if(a==='add'){const d={id:newId('d'),name:'',maker:'',type:'',size:'',price:null,temp:'',ai:false,photo:null,checked:false};drinks().push(d);selId=d.id;ctx.onChange();drawGrid();drawEd();const f=R('ed').querySelector('[data-f="name"]');if(f)f.focus();}
     else if(a==='close-ed'){selId=null;drawGrid();drawEd();}
     else if(a==='del'){const i=drinks().findIndex(x=>x.id===selId);if(i>=0){drinks().splice(i,1);ctx.onChange();}selId=null;drawGrid();drawEd();}
     else if(a==='cancel'){if(busy)busy.abort();}
     else if(a==='setup')openSettings();
-    else if(a==='all'){const blob=ctx.getBlob();if(blob)run('all',blob);else setStatus('写真を読み込めませんでした。');}
-    else if(a==='crop'){const url=ctx.getUrl();if(url)openCropper(url,blob=>run('one',blob));}
+    else if(a==='all'){const blob=ctx.getBlob();if(blob)readOne(blob,'all');else setStatus('写真を読み込めませんでした。');}
+    else if(a==='crop'){const url=ctx.getUrl();if(url)openCropper(url,blob=>readOne(blob,'one'));}
     else if(a==='photo'){R('file').value='';R('file').click();}
+    else if(a==='recrop'){
+      const id=selId,url=ctx.getUrl();if(!url)return;
+      openCropper(url,async blob=>{const d=getD(id);if(!d)return;try{d.photo=await shrinkBlob(blob,360);ctx.onChange();drawGrid();drawEd();}catch(err){toast('写真を切り抜けませんでした。');}},{title:'この飲料だけを指でなぞる',ok:'この範囲で決定',all:'写真全体'});
+    }
+    else if(a==='aicrop')locateOne(selId);
+    else if(a==='dshot'){R('dfile').value='';R('dfile').click();}
+    else if(a==='dphoto-del'){const d=getD(selId);if(d){d.photo=null;ctx.onChange();drawGrid();drawEd();}}
+    else if(a==='look')lookOne(selId);
+    else if(a==='look-all')lookAll();
+    else if(a==='look-apply'){const d=getD(selId),L=look[selId];if(d&&L&&L.o){applyLook(d,L.o,L.refs);delete look[selId];ctx.onChange();setStatus('反映しました。');drawGrid();drawEd();}}
+    else if(a==='look-skip'){delete look[selId];drawLk();}
+    else if(a==='look-undo'){const d=getD(selId);if(d&&d.orig){Object.assign(d,d.orig);d.checked=false;d.refs=[];delete d.orig;ctx.onChange();drawGrid();drawEd();}}
   });
   root.addEventListener('input',e=>{
     const f=e.target.dataset&&e.target.dataset.f;if(!f)return;
-    const ed=e.target.closest('.ed');const d=drinks().find(x=>x.id===(ed&&ed.dataset.id));if(!d)return;
+    const ed=e.target.closest('.ed');const d=getD(ed&&ed.dataset.id);if(!d)return;
     if(f==='price'){const n=parseInt(String(e.target.value).replace(/[^\d]/g,''),10);d.price=isFinite(n)&&n>0?n:null;}
-    else d[f]=e.target.value;
+    else{
+      d[f]=e.target.value;
+      if((f==='name'||f==='maker')&&d.checked){d.checked=false;drawLk();}
+    }
     ctx.onChange();drawGrid();
   });
   root.addEventListener('change',async e=>{
-    if(e.target!==R('file')||!e.target.files[0])return;
-    const file=e.target.files[0];
-    try{const url=URL.createObjectURL(file);const img=await loadImg(url);const blob=await imgBlob(img,1280,.88);URL.revokeObjectURL(url);run('one',blob);}
-    catch(err){setStatus('この写真は読み込めませんでした。JPEGかPNGでお試しください。');}
+    const t=e.target,file=t.files&&t.files[0];
+    if(!file)return;
+    if(t===R('file')){
+      try{const url=URL.createObjectURL(file);const img=await loadImg(url);const blob=await imgBlob(img,1280,.88);URL.revokeObjectURL(url);readOne(blob,'one');}
+      catch(err){setStatus('この写真は読み込めませんでした。JPEGかPNGでお試しください。');}
+    }else if(t===R('dfile')){
+      const id=selId;
+      try{const d=getD(id);if(!d)return;d.photo=await shrinkBlob(file,360);ctx.onChange();drawGrid();drawEd();}
+      catch(err){toast('この写真は読み込めませんでした。');}
+    }
   });
   drawAll();
   return {destroy(){if(busy)busy.abort();}};
 }
 
-function openCropper(url,onDone){
+function openCropper(url,onDone,opts){
+  opts=opts||{};
   const el=document.createElement('div');el.className='cropper';
-  el.innerHTML='<div class="cr-top"><button class="btn sm" type="button" data-c="x">キャンセル</button><span>読み取る商品を指でなぞる</span><span style="width:84px"></span></div><div class="cr-stage"><div class="cr-wrap"><img alt="読み取り元の写真"><div class="cr-box" hidden></div></div></div><p class="cr-help">商品見本と価格表示が入るように四角で囲みます。</p><div class="cr-bottom"><button class="btn" type="button" data-c="all">写真全体</button><button class="btn primary" type="button" data-c="ok" disabled>この範囲を読み取る</button></div>';
+  el.innerHTML='<div class="cr-top"><button class="btn sm" type="button" data-c="x">キャンセル</button><span>'+esc(opts.title||'読み取る商品を指でなぞる')+'</span><span style="width:84px"></span></div><div class="cr-stage"><div class="cr-wrap"><img alt="元の写真"><div class="cr-box" hidden></div></div></div><p class="cr-help">商品の見本だけが入るように四角で囲みます。</p><div class="cr-bottom"><button class="btn" type="button" data-c="all">'+esc(opts.all||'写真全体')+'</button><button class="btn primary" type="button" data-c="ok" disabled>'+esc(opts.ok||'この範囲を読み取る')+'</button></div>';
   document.body.appendChild(el);
   const img=$('img',el),box=$('.cr-box',el),wrap=$('.cr-wrap',el),ok=$('[data-c="ok"]',el);
   let sel=null,start=null;
@@ -1014,7 +1227,7 @@ async function saveDraft(){
   try{
     const now=Date.now();
     const m={id:newId('m'),photoBlob:d.big,thumbBlob:d.thumb,lat:d.lat,lng:d.lng,locSource:d.locSource||'',placeNote:d.placeNote.trim(),memo:d.memo.trim(),shotAt:d.shotAt,createdAt:now,updatedAt:now,
-      drinks:d.drinks.filter(x=>String(x.name||'').trim()).map(x=>({id:x.id,name:String(x.name).trim(),maker:String(x.maker||'').trim(),type:x.type||'',size:String(x.size||'').trim(),price:typeof x.price==='number'?x.price:null,temp:x.temp||'',ai:!!x.ai}))};
+      drinks:d.drinks.filter(x=>String(x.name||'').trim()).map(x=>({id:x.id,name:String(x.name).trim(),maker:String(x.maker||'').trim(),type:x.type||'',size:String(x.size||'').trim(),price:typeof x.price==='number'?x.price:null,temp:x.temp||'',ai:!!x.ai,photo:x.photo||null,checked:!!x.checked,refs:x.refs||[],orig:x.orig||null}))};
     await insertMachine(m);
     closeRegister();refreshAll();toast('登録しました。');
     if(hasLoc(m)){state.fitted=true;showOnMap(m.id);}else setTab('list');
@@ -1041,7 +1254,7 @@ function fillProv(p,initial){
   $('#set-key').placeholder=P.ph;
   $('#set-model').innerHTML=P.models.map(([v,t])=>'<option value="'+v+'"'+((ls.get('jm-model-'+p)||P.models[0][0])===v?' selected':'')+'>'+t+'</option>').join('');
   $('#set-keylink').href=P.keyUrl;
-  $('#set-free').textContent=p==='gemini'?'Googleアカウントがあれば、AI Studio で無料のキーを発行できます（クレジットカード不要）。無料枠では回数の上限があり、入力した写真がGoogleのサービス改善に使われることがあります。人の顔が写った写真は使わないでください。':'Claudeは従量課金です。クレジットの登録が必要です。';
+  $('#set-free').textContent=p==='gemini'?'Googleアカウントがあれば、AI Studio で無料のキーを発行できます（クレジットカード不要）。無料枠では回数の上限があり、入力した写真がGoogleのサービス改善に使われることがあります。人の顔が写った写真は使わないでください。ネット照合はGoogle検索を使うため、1日あたりの回数上限が小さめです。':'Claudeは従量課金です。クレジットの登録が必要です。';
 }
 function closeSettings(){const s=$('#sheet-set');s.hidden=true;s.innerHTML='';if($('#sheet-reg').hidden&&$('#sheet-det').hidden)document.body.classList.remove('lock');}
 async function exportAll(){
@@ -1051,6 +1264,8 @@ async function exportAll(){
     for(const m of state.machines){
       const o=rec(m);delete o.photoBlob;delete o.thumbBlob;
       o.photo=m.photoBlob?await blobToDataURL(m.photoBlob):null;o.thumb=m.thumbBlob?await blobToDataURL(m.thumbBlob):null;
+      o.drinks=[];
+      for(const d of (m.drinks||[])){const c=Object.assign({},d);c.photo=d.photo?await blobToDataURL(d.photo):null;o.drinks.push(c);}
       out.push(o);
     }
     const blob=new Blob([JSON.stringify({app:'jihanki-map',version:1,exportedAt:Date.now(),machines:out})],{type:'application/json'});
@@ -1072,6 +1287,8 @@ async function importAll(file){
       m.photoBlob=o.photo?await (await fetch(o.photo)).blob():null;
       m.thumbBlob=o.thumb?await (await fetch(o.thumb)).blob():null;
       delete m.photo;delete m.thumb;
+      m.drinks=[];
+      for(const d of (Array.isArray(o.drinks)?o.drinks:[])){const c=Object.assign({},d);c.photo=d.photo&&typeof d.photo==='string'?await (await fetch(d.photo)).blob():null;m.drinks.push(c);}
       if(state.persist)await idbPut(m);
       const old=getM(m.id);
       if(old){[old._thumb,old._photo].forEach(u=>{if(u)URL.revokeObjectURL(u);});state.machines=state.machines.filter(x=>x.id!==m.id);}
@@ -1099,6 +1316,8 @@ function bind(){
     if(e.target.closest('[data-floc]')){state.f.located=!state.f.located;syncFilters();refreshAll();return;}
     const tb=e.target.closest('[data-tab]');
     if(tb){setTab(tb.dataset.tab);return;}
+    const bo=e.target.closest('[data-base]');
+    if(bo){setBase(+bo.dataset.base,false);hideBasePop();return;}
     const b=e.target.closest('[data-act]');if(!b)return;
     const a=b.dataset.act;
     if(a==='reg-open')openRegister();
